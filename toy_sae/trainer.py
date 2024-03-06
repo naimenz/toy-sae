@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 import random
+from typing import Optional
 from toy_sae.dataset_generation import Dataset
 from toy_sae.sae import SAE
 import torch
 import wandb
+from tqdm import tqdm
 
 
 @dataclass
@@ -17,22 +19,36 @@ class TrainingConfig:
 class Trainer:
     """Trainer to run SAE training."""
 
-    def __init__(self, model: SAE, dataset: Dataset):
+    def __init__(self, model: SAE, dataset: Dataset, valid_dataset: Optional[Dataset]):
         """
         Args:
             model: the SAE model
             dataset: the dataset
-            learning_rate: the learning rate
-            sparsity_penalty: the sparsity penalty (coefficient of the L1 penalty)
+            valid_dataset: the validation dataset
         """
         self.model = model
         self.dataset = dataset
+        self.valid_dataset = valid_dataset
 
     def train(self, training_config: TrainingConfig):
         self._start_wandb_run(training_config)
         optimizer = torch.optim.SGD(self.model.parameters(), lr=training_config.learning_rate)
-        for epoch in range(training_config.n_epochs):
+        for epoch in tqdm(range(training_config.n_epochs)):
+            if self.valid_dataset is not None:
+                with torch.no_grad():
+                    valid_loss, (valid_mse, valid_sparsity) = self._compute_validation_loss(self.model)
+                wandb.log(
+                    {"epoch": epoch, "val_mse_loss": valid_mse, "val_sparsity_loss": valid_sparsity}
+                )
+
             self._train_epoch(self.model, self.dataset, optimizer, epoch, training_config)
+
+    def _compute_validation_loss(self, model: SAE) -> tuple[float, tuple[float, float]]:
+        assert self.valid_dataset is not None
+        valid_dataset = self.valid_dataset.dense_vectors
+        out = model(valid_dataset)
+        loss, (mse_loss, sparsity_loss) = self._loss(out, valid_dataset, model, 0.0)
+        return loss.item(), (mse_loss.item(), sparsity_loss.item())
 
     def _train_epoch(
         self,
@@ -46,13 +62,21 @@ class Trainer:
         all_batch_indices = self._get_batch_indices(
             training_config.batch_size, dataset.dense_vectors.shape[0]
         )
+        n_batches = len(all_batch_indices)
+        batch_offset = epoch * n_batches
         for i, batch_indices in enumerate(all_batch_indices):
             batch_inputs = dataset.dense_vectors[batch_indices]
-            train_loss = self._train_batch(
+            train_loss, (mse_loss, sparsity_loss) = self._train_batch(
                 model, optimizer, batch_inputs, training_config.sparsity_penalty
             )
-            wandb.log({"train-loss": train_loss})
-            print(f"Epoch {epoch}, batch {i}, train loss: {train_loss}")
+            wandb.log(
+                {
+                    "batch": batch_offset + i,
+                    "train_mse_loss": mse_loss,
+                    "train_sparsity_loss": sparsity_loss,
+                    "train_loss": train_loss,
+                }
+            )
 
     def _train_batch(
         self,
@@ -60,24 +84,24 @@ class Trainer:
         optimizer: torch.optim.Optimizer,
         batch_inputs: torch.Tensor,
         sparsity_penalty: float,
-    ):
+    ) -> tuple[float, tuple[float, float]]:
         out = model(batch_inputs)
         # since it's an autoencoder, the input is the target
-        loss = self._loss(out, batch_inputs, model, sparsity_penalty)
+        loss, (mse_loss, sparsity_loss) = self._loss(out, batch_inputs, model, sparsity_penalty)
         loss.backward()
         optimizer.step()
-        return loss.item()
+        return loss.item(), (mse_loss.item(), sparsity_loss.item())
 
     def _loss(
         self, out: torch.Tensor, batch_inputs: torch.Tensor, model: SAE, sparsity_penalty: float
     ):
         """Loss is an MSE reconstruction loss plus a sparsity penalty."""
-        mse_part = torch.mean((out - batch_inputs) ** 2)
+        mse_loss = torch.mean((out - batch_inputs) ** 2)
         # NOTE: anthropic uses sum while Logan uses mean;
         # mean makes more sense to me
-        l1_part = sparsity_penalty * torch.mean(torch.abs(model.W))
-        loss = mse_part + l1_part
-        return loss
+        sparsity_loss = sparsity_penalty * torch.mean(torch.abs(model.W))
+        loss = mse_loss + sparsity_loss
+        return loss, (mse_loss, sparsity_loss)
 
     def _get_batch_indices(self, batch_size: int, n_examples: int):
         """Return a shuffled list of indices for all batches in an epoch."""

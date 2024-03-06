@@ -19,8 +19,9 @@ def main(
 ):
     gen = DatasetGenerator(n_dims, n_surplus, seed)
     dataset = gen.generate_dataset(n_examples, sparse_fraction)
+    valid_dataset = gen.generate_dataset(n_examples, sparse_fraction)
     model = SAE(n_dims, n_hidden)
-    trainer = Trainer(model, dataset)
+    trainer = Trainer(model, dataset, valid_dataset)
     training_config = TrainingConfig(
         learning_rate=learning_rate,
         sparsity_penalty=sparse_penalty,

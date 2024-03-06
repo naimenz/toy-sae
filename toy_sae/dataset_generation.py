@@ -51,6 +51,7 @@ class DatasetGenerator:
         self.n_dims = n_dims
         self.n_surplus = n_surplus
         self.seed = seed
+        self.rng = torch.random.manual_seed(self.seed)
         self.gt_dictionary = self._generate_dense_vectors(n_dims, n_surplus)
 
     def generate_dataset(self, n_examples: int, sparse_fraction: float):
@@ -60,9 +61,8 @@ class DatasetGenerator:
             n_examples: number of examples to generate
             sparse_fraction: fraction of entries in the binary vectors that are non-zero
         """
-        rng = torch.random.manual_seed(self.seed)
         n_dict, n_dims = self.gt_dictionary.shape
-        binary_vectors = torch.rand(n_examples, n_dict, generator=rng)
+        binary_vectors = torch.rand(n_examples, n_dict, generator=self.rng)
         binary_vectors = (binary_vectors < sparse_fraction).int()
 
         examples = []
@@ -85,8 +85,7 @@ class DatasetGenerator:
 
         TODO: change this to generate nearly-orthogonal vectors more
         thoughtfully."""
-        rng = torch.random.manual_seed(self.seed)
-        dense_vectors = 2 * (-0.5 + torch.rand(n_dims + n_surplus, n_dims, generator=rng))
+        dense_vectors = 2 * (-0.5 + torch.rand(n_dims + n_surplus, n_dims, generator=self.rng))
         # rescale each vector to be unit length
         dense_vectors = dense_vectors / torch.norm(dense_vectors, dim=1).reshape(-1, 1)
 
