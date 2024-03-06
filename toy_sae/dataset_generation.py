@@ -9,6 +9,7 @@ class Dataset:
     gt_binary_vectors: torch.Tensor
     dense_vectors: torch.Tensor
     gt_dictionary: torch.Tensor
+    sparsity: float
 
     def to_file(self, path: str):
         """Write the dataset to a pt file."""
@@ -16,6 +17,7 @@ class Dataset:
             "gt_binary_vectors": self.gt_binary_vectors,
             "dense_vectors": self.dense_vectors,
             "gt_dictionary": self.gt_dictionary,
+            "sparsity": self.sparsity,
         }
         torch.save(data, path)
     
@@ -28,6 +30,7 @@ class Dataset:
             gt_binary_vectors=data["gt_binary_vectors"],
             dense_vectors=data["dense_vectors"],
             gt_dictionary=data["gt_dictionary"],
+            sparsity=data["sparsity"],
         )
 
 
@@ -60,7 +63,7 @@ class DatasetGenerator:
         rng = torch.random.manual_seed(self.seed)
         n_dict, n_dims = self.gt_dictionary.shape
         binary_vectors = torch.rand(n_examples, n_dict, generator=rng)
-        binary_vectors = (binary_vectors < sparse_fraction)
+        binary_vectors = (binary_vectors < sparse_fraction).int()
 
         examples = []
         for binary_vector in binary_vectors:
@@ -74,6 +77,7 @@ class DatasetGenerator:
             gt_binary_vectors=binary_vectors,
             dense_vectors=tensor_examples,
             gt_dictionary=self.gt_dictionary,
+            sparsity=sparse_fraction,
         )
 
     def _generate_dense_vectors(self, n_dims: int, n_surplus: int):

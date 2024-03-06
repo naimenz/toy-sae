@@ -8,10 +8,13 @@ packages = [{include = "toy_sae"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
+fire = "^0.5.0"
 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.2"
+wandb = "^0.16.4"
+ipykernel = "^6.29.3"
 
 [build-system]
 requires = ["poetry-core"]
