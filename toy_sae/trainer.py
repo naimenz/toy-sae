@@ -88,6 +88,8 @@ class Trainer:
         out = model(batch_inputs)
         # since it's an autoencoder, the input is the target
         loss, (mse_loss, sparsity_loss) = self._loss(out, batch_inputs, model, sparsity_penalty)
+        # print the weights for debugging
+        print(model.W)
         loss.backward()
         optimizer.step()
         return loss.item(), (mse_loss.item(), sparsity_loss.item())

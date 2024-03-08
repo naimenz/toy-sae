@@ -52,7 +52,7 @@ class DatasetGenerator:
         self.n_surplus = n_surplus
         self.seed = seed
         self.rng = torch.random.manual_seed(self.seed)
-        self.gt_dictionary = self._generate_dense_vectors(n_dims, n_surplus)
+        self.gt_dictionary = self._generate_gt_dictionary(n_dims, n_surplus)
 
     def generate_dataset(self, n_examples: int, sparse_fraction: float):
         """Generate a dataset of examples.
@@ -67,7 +67,8 @@ class DatasetGenerator:
 
         examples = []
         for binary_vector in binary_vectors:
-            selected_vectors = self.gt_dictionary[binary_vector]
+            index_vector = _binary_vector_to_index_vector(binary_vector)
+            selected_vectors = self.gt_dictionary[index_vector]
             example = torch.sum(selected_vectors, dim=0)
             examples.append(example)
         tensor_examples = torch.stack(examples)
@@ -80,21 +81,39 @@ class DatasetGenerator:
             sparsity=sparse_fraction,
         )
 
-    def _generate_dense_vectors(self, n_dims: int, n_surplus: int):
+    def _generate_gt_dictionary(self, n_dims: int, n_surplus: int):
         """Generate n_dims + n_surplus dense vectors of dimension n_dims.
 
         TODO: change this to generate nearly-orthogonal vectors more
         thoughtfully."""
-        dense_vectors = 2 * (-0.5 + torch.rand(n_dims + n_surplus, n_dims, generator=self.rng))
+        gt_dictionary = 2 * (-0.5 + torch.rand(n_dims + n_surplus, n_dims, generator=self.rng))
         # rescale each vector to be unit length
-        dense_vectors = dense_vectors / torch.norm(dense_vectors, dim=1).reshape(-1, 1)
+        gt_dictionary = gt_dictionary / torch.norm(gt_dictionary, dim=1).reshape(-1, 1)
 
         # post-conditions
-        assert dense_vectors.shape == (n_dims + n_surplus, n_dims), "shape incorrect"
+        assert gt_dictionary.shape == (n_dims + n_surplus, n_dims), "shape incorrect"
         assert torch.allclose(
-            torch.norm(dense_vectors, dim=1), torch.ones(n_dims + n_surplus)
+            torch.norm(gt_dictionary, dim=1), torch.ones(n_dims + n_surplus)
         ), "not unit length"
-        return dense_vectors
+        return gt_dictionary
+
+def _binary_vector_to_index_vector(binary_vector: torch.Tensor) -> torch.Tensor:
+    """Convert a binary vector indicating which vectors to select into an indexing
+    vector that can retrieve them.
+    
+    Example:
+        binary_vector = torch.tensor([0, 1, 0, 1])
+        index_vector = torch.tensor([1, 3])
+    """
+    # pre-conditions
+    assert binary_vector.ndim == 1, "binary_vector must be 1D"
+    assert binary_vector.dtype in [torch.int32, torch.int64], "binary_vector must be int"
+    assert torch.all((binary_vector == 0) | (binary_vector == 1)), "binary_vector must be binary"
+
+    index_vector = torch.nonzero(binary_vector).reshape(-1)
+    print(f"{binary_vector = }, {index_vector = }")
+    assert index_vector.ndim == 1, "index_vector must be 1D"
+    return index_vector
 
 
 def main():
