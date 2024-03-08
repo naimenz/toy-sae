@@ -111,7 +111,6 @@ def _binary_vector_to_index_vector(binary_vector: torch.Tensor) -> torch.Tensor:
     assert torch.all((binary_vector == 0) | (binary_vector == 1)), "binary_vector must be binary"
 
     index_vector = torch.nonzero(binary_vector).reshape(-1)
-    print(f"{binary_vector = }, {index_vector = }")
     assert index_vector.ndim == 1, "index_vector must be 1D"
     return index_vector
 

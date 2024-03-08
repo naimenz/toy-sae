@@ -15,6 +15,7 @@ def main(
         sparse_penalty: float,
         n_epochs: int,
         batch_size: int,
+        optimizer: str,
         seed: int,
 ):
     gen = DatasetGenerator(n_dims, n_surplus, seed)
@@ -27,6 +28,7 @@ def main(
         sparsity_penalty=sparse_penalty,
         n_epochs=n_epochs,
         batch_size=batch_size,
+        optimizer=optimizer,
     )
     trainer.train(training_config)
 

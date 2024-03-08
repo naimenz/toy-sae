@@ -7,6 +7,7 @@ import torch
 import wandb
 from tqdm import tqdm
 
+Optimizers = {"sgd": torch.optim.SGD, "adam": torch.optim.Adam}
 
 @dataclass
 class TrainingConfig:
@@ -14,6 +15,7 @@ class TrainingConfig:
     sparsity_penalty: float
     n_epochs: int
     batch_size: int
+    optimizer: str = "SGD"
 
 
 class Trainer:
@@ -32,7 +34,8 @@ class Trainer:
 
     def train(self, training_config: TrainingConfig):
         self._start_wandb_run(training_config)
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=training_config.learning_rate)
+        optim_f = Optimizers[training_config.optimizer]
+        optimizer = optim_f(self.model.parameters(), lr=training_config.learning_rate)
         for epoch in tqdm(range(training_config.n_epochs)):
             if self.valid_dataset is not None:
                 with torch.no_grad():
@@ -88,8 +91,6 @@ class Trainer:
         out = model(batch_inputs)
         # since it's an autoencoder, the input is the target
         loss, (mse_loss, sparsity_loss) = self._loss(out, batch_inputs, model, sparsity_penalty)
-        # print the weights for debugging
-        print(model.W)
         loss.backward()
         optimizer.step()
         return loss.item(), (mse_loss.item(), sparsity_loss.item())
@@ -121,6 +122,7 @@ class Trainer:
             "training_sparsity_penalty": training_config.sparsity_penalty,
             "training_n_epochs": training_config.n_epochs,
             "training_batch_size": training_config.batch_size,
+            "training_optimizer": training_config.optimizer,
         }
         wandb.init(project="toy-sae", entity="naimenz", config=config, reinit=True)
         wandb.watch(self.model)
