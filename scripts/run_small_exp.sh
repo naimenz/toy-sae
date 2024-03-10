@@ -6,7 +6,7 @@ python toy_sae/run_experiment.py \
     --sparse_fraction 0.1 \
     --n_hidden 15 \
     --learning_rate 0.0001 \
-    --sparse_penalty 0.1 \
+    --sparse_penalty 0.05 \
     --n_epochs 100 \
     --batch_size 100 \
     --optimizer adam \

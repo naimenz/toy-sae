@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import random
 from typing import Optional
 from toy_sae.dataset_generation import Dataset
+from toy_sae.dictionary_score import get_dictionary_score
 from toy_sae.sae import SAE
 import torch
 import wandb
@@ -72,12 +73,14 @@ class Trainer:
             train_loss, (mse_loss, sparsity_loss) = self._train_batch(
                 model, optimizer, batch_inputs, training_config.sparsity_penalty
             )
+            dictionary_score = get_dictionary_score(model.W.T, dataset.gt_dictionary)
             wandb.log(
                 {
                     "batch": batch_offset + i,
                     "train_mse_loss": mse_loss,
                     "train_sparsity_loss": sparsity_loss,
                     "train_loss": train_loss,
+                    "train_dictionary_score": dictionary_score,
                 }
             )
 

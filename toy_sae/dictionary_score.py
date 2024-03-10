@@ -30,11 +30,6 @@ def get_dictionary_score(weights, ground_truth_vectors) -> float:
                 best_gt = gt
         score += best_dot
 
-        print("=====")
-        print(f"{torch.norm(w) = }")
-        print(f"{normed_w = }")
-        print(f"{best_gt = }")
-        print(f"{best_dot = }")
     normed_score = score / len(weights)
     return normed_score
 
