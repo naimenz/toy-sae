@@ -7,6 +7,7 @@ from toy_sae.sae import SAE
 import torch
 import wandb
 from tqdm import tqdm
+from wandb import sdk as wandb_sdk
 
 Optimizers = {"sgd": torch.optim.SGD, "adam": torch.optim.Adam}
 
@@ -34,11 +35,11 @@ class Trainer:
         self.dataset = dataset
         self.valid_dataset = valid_dataset
 
-    def train(self, training_config: TrainingConfig):
-        self._start_wandb_run(training_config)
-        optim_f = Optimizers[training_config.optimizer]
-        optimizer = optim_f(self.model.parameters(), lr=training_config.learning_rate)
-        for epoch in tqdm(range(training_config.n_epochs)):
+    def train(self, training_config: TrainingConfig | None):
+        config = self._start_wandb_run(training_config)
+        optim_f = Optimizers[config.optimizer]
+        optimizer = optim_f(self.model.parameters(), lr=config.learning_rate)
+        for epoch in tqdm(range(config.n_epochs)):
             if self.valid_dataset is not None:
                 valid_loss, (valid_mse, valid_sparsity) = self._compute_validation_loss(
                     self.model
@@ -52,7 +53,8 @@ class Trainer:
                     }
                 )
 
-            self._train_epoch(self.model, self.dataset, optimizer, epoch, training_config)
+            self._train_epoch(self.model, self.dataset, optimizer, epoch, config)
+        self._log_final_metrics()
     
     def _log_final_metrics(self):
         if self.valid_dataset is not None:
@@ -79,18 +81,18 @@ class Trainer:
         dataset: Dataset,
         optimizer: torch.optim.Optimizer,
         epoch: int,
-        training_config: TrainingConfig,
+        config: wandb_sdk.Config,
     ):
         """Train a single epoch."""
         all_batch_indices = self._get_batch_indices(
-            training_config.batch_size, dataset.dense_vectors.shape[0]
+            config.batch_size, dataset.dense_vectors.shape[0]
         )
         n_batches = len(all_batch_indices)
         batch_offset = epoch * n_batches
         for i, batch_indices in enumerate(all_batch_indices):
             batch_inputs = dataset.dense_vectors[batch_indices]
             train_loss, (mse_loss, sparsity_loss) = self._train_batch(
-                model, optimizer, batch_inputs, training_config.sparsity_penalty
+                model, optimizer, batch_inputs, config.sparsity_penalty
             )
             dictionary_score = get_dictionary_score(model.W.T, dataset.gt_dictionary)
             wandb.log(
@@ -134,20 +136,27 @@ class Trainer:
         random.shuffle(indices)
         return [indices[i : i + batch_size] for i in range(0, n_examples, batch_size)]
 
-    def _start_wandb_run(self, training_config: TrainingConfig):
+    def _start_wandb_run(self, training_config: TrainingConfig | None) -> wandb_sdk.Config:
         config = {
             "dataset_size": self.dataset.dense_vectors.shape[0],
             "dataset_n_dims": self.dataset.dense_vectors.shape[1],
             "dataset_sparsity_fraction": self.dataset.sparsity,
             "model_n_hidden": self.model.W.shape[1],
-            "training_learning_rate": training_config.learning_rate,
-            "training_sparsity_penalty": training_config.sparsity_penalty,
-            "training_n_epochs": training_config.n_epochs,
-            "training_batch_size": training_config.batch_size,
-            "training_optimizer": training_config.optimizer,
         }
+        # optionally add training_config params (not necessary if e.g. in a sweep)
+        if training_config is not None:
+            config.update(
+                {
+                    "training_learning_rate": training_config.learning_rate,
+                    "training_sparsity_penalty": training_config.sparsity_penalty,
+                    "training_n_epochs": training_config.n_epochs,
+                    "training_batch_size": training_config.batch_size,
+                    "training_optimizer": training_config.optimizer,
+                }
+            )
         wandb.init(project="toy-sae", entity="naimenz", config=config, reinit=True)
         wandb.watch(self.model)
+        return wandb.config
 
     def _finish_wandb_run(self):
         wandb.finish()

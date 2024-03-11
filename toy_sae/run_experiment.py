@@ -12,11 +12,12 @@ def run_exp(
         sparse_fraction: float,
         n_hidden: int,
         learning_rate: float,
-        sparse_penalty: float,
+        sparsity_penalty: float,
         n_epochs: int,
         batch_size: int,
         optimizer: str,
         seed: int,
+        **kwargs,  # needed for making a partial and using wandb.sweep
 ):
     gen = DatasetGenerator(n_dims, n_surplus, seed)
     dataset = gen.generate_dataset(n_examples, sparse_fraction)
@@ -25,7 +26,7 @@ def run_exp(
     trainer = Trainer(model, dataset, valid_dataset)
     training_config = TrainingConfig(
         learning_rate=learning_rate,
-        sparsity_penalty=sparse_penalty,
+        sparsity_penalty=sparsity_penalty,
         n_epochs=n_epochs,
         batch_size=batch_size,
         optimizer=optimizer,
