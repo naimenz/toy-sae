@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 Optimizers = {"sgd": torch.optim.SGD, "adam": torch.optim.Adam}
 
+
 @dataclass
 class TrainingConfig:
     learning_rate: float
@@ -39,20 +40,38 @@ class Trainer:
         optimizer = optim_f(self.model.parameters(), lr=training_config.learning_rate)
         for epoch in tqdm(range(training_config.n_epochs)):
             if self.valid_dataset is not None:
-                with torch.no_grad():
-                    valid_loss, (valid_mse, valid_sparsity) = self._compute_validation_loss(self.model)
+                valid_loss, (valid_mse, valid_sparsity) = self._compute_validation_loss(
+                    self.model
+                )
                 wandb.log(
-                    {"epoch": epoch, "val_mse_loss": valid_mse, "val_sparsity_loss": valid_sparsity}
+                    {
+                        "epoch": epoch,
+                        "val_loss": valid_loss,
+                        "val_mse_loss": valid_mse,
+                        "val_sparsity_loss": valid_sparsity,
+                    }
                 )
 
             self._train_epoch(self.model, self.dataset, optimizer, epoch, training_config)
+    
+    def _log_final_metrics(self):
+        if self.valid_dataset is not None:
+            valid_loss, (valid_mse, valid_sparsity) = self._compute_validation_loss(self.model)
+            wandb.summary["final_val_loss"] = valid_loss
+            wandb.summary["final_val_mse_loss"] = valid_mse
+            wandb.summary["final_val_sparsity_loss"] = valid_sparsity
+        # compute the final dictionary score
+        dictionary_score = get_dictionary_score(self.model.W.T, self.dataset.gt_dictionary)
+        wandb.summary["final_dictionary_score"] = dictionary_score
+
 
     def _compute_validation_loss(self, model: SAE) -> tuple[float, tuple[float, float]]:
         assert self.valid_dataset is not None
-        valid_dataset = self.valid_dataset.dense_vectors
-        out = model(valid_dataset)
-        loss, (mse_loss, sparsity_loss) = self._loss(out, valid_dataset, model, 0.0)
-        return loss.item(), (mse_loss.item(), sparsity_loss.item())
+        with torch.no_grad():
+            valid_dataset = self.valid_dataset.dense_vectors
+            out = model(valid_dataset)
+            loss, (mse_loss, sparsity_loss) = self._loss(out, valid_dataset, model, 0.0)
+            return loss.item(), (mse_loss.item(), sparsity_loss.item())
 
     def _train_epoch(
         self,

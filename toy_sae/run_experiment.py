@@ -5,7 +5,7 @@ from toy_sae.sae import SAE
 from toy_sae.trainer import Trainer, TrainingConfig
 
 
-def main(
+def run_exp(
         n_dims: int,
         n_surplus: int,
         n_examples: int,
@@ -33,4 +33,4 @@ def main(
     trainer.train(training_config)
 
 if __name__ == "__main__":
-    fire.Fire(main)
+    fire.Fire(run_exp)
