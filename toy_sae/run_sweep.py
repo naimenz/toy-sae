@@ -8,7 +8,6 @@ from toy_sae.sae import SAE
 from toy_sae.trainer import Trainer, TrainingConfig
 
 
-
 def main(
     sweep_count: int,
     sweep_name: str,
@@ -21,12 +20,29 @@ def main(
     seed: int,
 ):
     wandb.login()
-
+    sparsity_penalty_values = [
+        0.0,
+        1e-5,
+        3e-5,
+        1e-4,
+        3e-4,
+        1e-3,
+        3e-3,
+        1e-2,
+        3e-2,
+        1e-1,
+        3e-1,
+        1.0,
+        3.0,
+        10.0,
+    ]
     params_dict = {
-        "learning_rate": {"min": 1e-8, "max": 1e-1, "distribution": "log_uniform_values"},
-        "sparsity_penalty": {"min": 1e-8, "max": 1e2, "distribution": "log_uniform_values"},
-        "n_epochs": {"min": 1, "max": 500, "distribution": "int_uniform"},
-        "batch_size": {"values": [32, 64, 128, 256, 512, 1024], "distribution": "categorical"},
+        "learning_rate": {"values": [1e-6, 5e-6, 1e-5, 5e-5, 1e-4], "distribution": "categorical"},
+        "sparsity_penalty": {
+            "values": sparsity_penalty_values, "distribution": "categorical",
+        },
+        "n_epochs": {"values": [32, 64, 128], "distribution": "categorical"},
+        "batch_size": {"value": 256, "distribution": "constant"},
         "optimizer": {"value": "adam", "distribution": "constant"},
     }
 
@@ -47,6 +63,7 @@ def main(
 
     sweep_id = wandb.sweep(sweep_configuration, entity="naimenz", project="toy-sae")
     wandb.agent(sweep_id, sweep_fn, entity="naimenz", project="toy-sae", count=sweep_count)
+
 
 if __name__ == "__main__":
     fire.Fire(main)

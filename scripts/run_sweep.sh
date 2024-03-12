@@ -1,11 +1,11 @@
 
 python toy_sae/run_sweep.py \
-    --sweep_name "grid-sweep-1" \
-    --sweep_count 100 \
+    --sweep_name "bigger-grid-sweep" \
+    --sweep_count 210 \
     --sweep_method grid \
-    --n_dims 10 \
-    --n_surplus 5 \
-    --n_examples 10000 \
-    --sparse_fraction 0.1 \
-    --n_hidden 15 \
+    --n_dims 256 \
+    --n_surplus 256 \
+    --n_examples 16384 \
+    --sparse_fraction 0.01 \
+    --n_hidden 512 \
     --seed 0
